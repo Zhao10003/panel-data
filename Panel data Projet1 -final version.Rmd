@@ -1,0 +1,137 @@
+---
+title: "Panel data"
+author: "SHEN SHIXUAN,ZHAO YAQI"
+date: "2023/10/3"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages('stargazer')
+library(stargazer)
+```
+
+```{r}
+library(plm)
+```
+
+télécharge data
+```{r}
+
+data(Wages)
+attach(Wages)
+
+```
+# étude statistiques
+```{r}
+summary(Wages)
+attach(Wages)
+hist(lwage)
+hist(exp)
+hist(wks)
+hist(ed)
+layout(matrix(1:8,2:4))
+boxplot(lwage~sex)
+boxplot(lwage~union)
+boxplot(lwage~married)
+boxplot(lwage~bluecol)
+boxplot(lwage~ind)
+boxplot(lwage~south)
+boxplot(lwage~smsa)
+boxplot(lwage~black)
+t.test(exp,lwage)
+t.test(wks,lwage)
+
+chisq.test(sex,lwage)
+
+Wages$Sex2<-ifelse(Wages$sex=="male",1,ifelse(Wages$sex=="female",2,NA))
+
+table.contingence<-table(Wages$Sex2,bluecol)
+```
+Selon les graphiques,sauf les variables 'ind' et 'union',les autres variables semblement ont un impact sur le logwage.Le salaire median des hommes est plus grand que celui de femmes.
+On observe que le p-value est inférieur à 0.05,ça signifie qu'il y a une corrélation significative entre exp et logwage, wks et logwage.
+
+# OLS méthode
+```{r}
+ols<-lm(lwage~exp+wks+bluecol+ind+south+smsa+married+sex+union+ed+black,data = Wages)
+summary(ols)
+layout(matrix(1:1))
+plot(exp,lwage)
+reg1 <- lm(lwage~exp, data=Wages)
+abline(reg1,col='red')
+reg2 <- lm(lwage~wks, data=Wages)
+plot(wks,lwage)
+abline(reg2,col='red')
+
+```
+Toutes les variables sont significatives.
+
+transformer à panel data
+```{r}
+Wag <- pdata.frame(Wages, index=595)
+```
+
+# pooling modèle 
+```{r}
+pool <- plm(lwage~exp+wks+bluecol+ind+south+smsa+married+sex+union+ed+black,data=Wag,model="pooling")
+summary(pool)
+```
+Le "pooling modèle" dans l'analyse des données de panel est une approche simplifiée qui traite toutes les entités et périodes comme un seul ensemble de données sans tenir compte des individus ni des effets spécifiques au temps. Le résultat est le même que celui du modèle OLS.
+
+# within modèle
+```{r}
+within <- plm(lwage~exp+wks+bluecol+ind+south+smsa+married+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within)
+```
+Certaines variables (ed, black, sex) disparaissent car les effets fixes individuels sont supprimés en soustrayant les moyennes spécifiques à l'entité des données.
+Il se concentre uniquement sur l'estimation des effets de variables variant dans le temps.
+
+```{r}
+within_1 <- plm(lwage~exp+wks+bluecol+ind+smsa+married+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within_1)
+```
+
+
+```{r}
+within_2 <- plm(lwage~exp+wks+bluecol+smsa+married+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within_2)
+```
+
+```{r}
+within_3 <- plm(lwage~exp+wks+bluecol+smsa+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within_3)
+```
+
+```{r}
+within_4 <- plm(lwage~exp+wks+smsa+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within_4)
+```
+
+```{r}
+within_5 <- plm(lwage~exp+smsa+sex+union+ed+black,data=Wag,model="within",effect='individual')
+summary(within_5)
+```
+Après avoir supprimé une par une les variables non significatives, on obtient un meilleur modèle avec seulement les variables significatives(exp,smsa,union).
+
+# OLS+fixed effect 
+```{r}
+olsfixedeffect<-lm(lwage~exp+wks+bluecol+ind+south+smsa+married+sex+union+ed+black+id,data = Wag)
+summary(olsfixedeffect)
+```
+le terme 'id' capture des effets fixes inobservables et invariables dans le temps pour tous les individus.Dans ce cas on peut estimer l'impact de ed/sex/black sur logwage.
+En comparant des coefficents des variables variants dans le temps,on observe que les estimates sont prèsques les mêmes car en effet, les deux models traitent l'hétérogénéité individuelle dans les données de panel en contrôlant les effets fixes individuels.
+Par conséquent, lors de l'utilisation de l'estimation par les MCO, les coefficients estimés par les MCO et ceux estimés par le modèle à effets fixes seront les mêmes si les variables nominales des effets fixes individuels sont correctement introduites. En effet, les deux modèles contrôlent les effets fixes individuels dans leur estimation, ce qui permet d'estimer avec précision l'effet de la variable explicative sur la variable expliquée avec des effets fixes individuels constants.
+Comparer entre OLS avec effet fixe et modèle within
+Si nous avons un grand nombre d'entités, le modèle within est préférable car il réduit le nombre de paramètres à estimer et nous permet d'estimer les effets des variables variant dans le temps tout en contrôlant les différences spécifiques à chaque individu.
+Si nous concentrons sur les variations spécifiques à chaque individu au fil du temps et que nous souhaitons capturer ces changements, nous pourrions utiliser le modèle OLS avec effet fixe car il fournit des estimations séparées pour chaque entité.
+
+
+
+
+
+
+
